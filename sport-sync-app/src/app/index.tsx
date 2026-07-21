@@ -1,6 +1,8 @@
 import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/supabase';
 
 import { AnimatedIcon } from '@/components/animated-icon';
 import { HintRow } from '@/components/hint-row';
@@ -29,19 +31,62 @@ function getDevMenuHint() {
 }
 
 export default function HomeScreen() {
+  const [dbStatus, setDbStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [sports, setSports] = useState<any[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  useEffect(() => {
+    async function checkConnection() {
+      try {
+        const { data, error } = await supabase.from('sports').select('*');
+        if (error) throw error;
+        setSports(data || []);
+        setDbStatus('connected');
+      } catch (err: any) {
+        setDbStatus('error');
+        setErrorMessage(err.message || 'Unknown error');
+        console.error('Supabase connection failed:', err);
+      }
+    }
+    checkConnection();
+  }, []);
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ThemedView style={styles.heroSection}>
           <AnimatedIcon />
           <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+            Sport Sync App
           </ThemedText>
         </ThemedView>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <ThemedView type="backgroundElement" style={styles.stepContainer}>
+          <ThemedText type="subtitle">Supabase Status:</ThemedText>
+          {dbStatus === 'connecting' && (
+            <ThemedText style={{ color: '#EAB308' }}>⏳ Đang kết nối tới Supabase...</ThemedText>
+          )}
+          {dbStatus === 'connected' && (
+            <View>
+              <ThemedText style={{ color: '#22C55E', fontWeight: 'bold' }}>
+                ✅ Kết nối thành công!
+              </ThemedText>
+              <ThemedText style={{ marginTop: Spacing.one }}>
+                Môn thể thao trong DB: {sports.map(s => s.name).join(', ') || 'Chưa có môn nào'}
+              </ThemedText>
+            </View>
+          )}
+          {dbStatus === 'error' && (
+            <View>
+              <ThemedText style={{ color: '#EF4444', fontWeight: 'bold' }}>
+                ❌ Lỗi kết nối!
+              </ThemedText>
+              <ThemedText type="small" style={{ color: '#EF4444' }}>
+                {errorMessage}
+              </ThemedText>
+            </View>
+          )}
+        </ThemedView>
 
         <ThemedView type="backgroundElement" style={styles.stepContainer}>
           <HintRow
@@ -49,10 +94,6 @@ export default function HomeScreen() {
             hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
           />
           <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
         </ThemedView>
 
         {Platform.OS === 'web' && <WebBadge />}
