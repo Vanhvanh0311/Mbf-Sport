@@ -1,0 +1,18 @@
+# Ignore dependencies and build outputs of the mobile app
+sport-sync-app/node_modules/
+sport-sync-app/.expo/
+sport-sync-app/dist/
+sport-sync-app/npm-debug.log*
+sport-sync-app/yarn-debug.log*
+sport-sync-app/yarn-error.log*
+
+# Ignore local Supabase Docker database data and secrets
+supabase-project/volumes/db/data/
+supabase-project/volumes/storage/
+supabase-project/.env
+supabase-project/test.http
+supabase-project/docker-compose.override.yml
+
+# General ignores
+.DS_Store
+*.local
