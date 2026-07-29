@@ -1,32 +1,55 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/supabase';
+import { authService } from '@/services/authService';
+import { UserProfile } from '@/types/auth';
 
 interface AuthContextType {
-  session: any;
-  user: any;
+  session: Session | null;
+  user: User | null;
+  profile: UserProfile | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<any>(null);
-  const [user, setUser] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfile = async (userId: string) => {
+    try {
+      const userProfile = await authService.getUserProfile(userId);
+      setProfile(userProfile);
+    } catch (err) {
+      console.error('Không thể lấy profile:', err);
+    }
+  };
+
   useEffect(() => {
-    // Lấy session hiện tại khi khởi chạy app
+    // 1. Khởi tạo session ban đầu
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
       setLoading(false);
     });
 
-    // Lắng nghe thay đổi trạng thái auth (đăng nhập/đăng xuất/token hết hạn)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // 2. Lắng nghe sự thay đổi Auth State
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
       setLoading(false);
     });
 
@@ -36,7 +59,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     setLoading(true);
     try {
-      await supabase.auth.signOut();
+      await authService.signOut();
+      setSession(null);
+      setUser(null);
+      setProfile(null);
     } catch (error) {
       console.error('Lỗi khi đăng xuất:', error);
     } finally {
@@ -44,8 +70,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchProfile(user.id);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ session, user, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
